@@ -28,11 +28,7 @@ function getTableFromUrl() {
 
 function getInitialView() {
   const params = new URLSearchParams(window.location.search);
-
-  if (params.get("admin") === "1") return "staff";
-  if (params.get("finance") === "1") return "finance";
-
-  return "customer";
+  return params.get("admin") === "1" ? "staff" : "customer";
 }
 
 export default function App() {
@@ -41,11 +37,6 @@ export default function App() {
   const [cart, setCart] = useState({});
   const [notes, setNotes] = useState("");
   const [orders, setOrders] = useState([]);
-  const [closedAccounts, setClosedAccounts] = useState([]);
-  const [financeTableFilter, setFinanceTableFilter] = useState("");
-  const [financeDateFilter, setFinanceDateFilter] = useState("");
-  const [financeStartTime, setFinanceStartTime] = useState("");
-  const [financeEndTime, setFinanceEndTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -62,7 +53,6 @@ export default function App() {
 // auto refresh
   useEffect(() => {
   loadOrders();
-  loadClosedAccounts();
 
   const channel = supabase
     .channel("orders-realtime")
@@ -75,7 +65,6 @@ export default function App() {
 
   const interval = setInterval(() => {
     loadOrders();
-    loadClosedAccounts();
   }, 5000);
 
   return () => {
@@ -100,20 +89,7 @@ export default function App() {
 
     setOrders(data || []);
   }
-async function loadClosedAccounts() {
-  const { data, error } = await supabase
-    .from("closed_accounts")
-    .select("*")
-    .order("closed_at", { ascending: false });
 
-  if (error) {
-    console.error(error);
-    setMessage("Error cargando finanzas.");
-    return;
-  }
-
-  setClosedAccounts(data || []);
-}
   function addItem(id) {
     setCart((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
   }
@@ -358,32 +334,7 @@ const groupedOrders = Object.values(
     return acc;
   }, {})
 );
-  const filteredClosedAccounts = closedAccounts.filter((account) => {
-  const closedDate = new Date(account.closed_at);
-
-  const matchesTable =
-    !financeTableFilter ||
-    String(account.table_number) === String(financeTableFilter);
-
-  const matchesDate =
-    !financeDateFilter ||
-    closedDate.toISOString().slice(0, 10) === financeDateFilter;
-
-  const closedTime = closedDate.toTimeString().slice(0, 5);
-
-  const matchesStartTime =
-    !financeStartTime || closedTime >= financeStartTime;
-
-  const matchesEndTime =
-    !financeEndTime || closedTime <= financeEndTime;
-
-  return matchesTable && matchesDate && matchesStartTime && matchesEndTime;
-});
-
-const filteredFinanceTotal = filteredClosedAccounts.reduce(
-  (sum, account) => sum + Number(account.total || 0),
-  0
-);
+  
 return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -397,7 +348,6 @@ return (
             <button style={view === "customer" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("customer")}>Cliente</button>
             <button style={view === "staff" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("staff")}>Personal</button>
             <button style={view === "qr" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("qr")}>QRs</button>
-			<button style={view === "finance" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("finance")}>Finanzas</button>
           </div>
         </header>
 
@@ -698,117 +648,7 @@ const totalEntregado = pedidosDeCuenta
             )}
           </main>
         )}
-        {view === "finance" && (
-  <main>
-    <section style={styles.card}>
-      <h2 style={styles.sectionTitle}>Finanzas</h2>
-      <p style={styles.helpText}>
-        Cuentas cerradas y pagadas. URL: {baseUrl}/?finance=1
-      </p>
-	  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-  <select
-    style={styles.select}
-    value={financeTableFilter}
-    onChange={(e) => setFinanceTableFilter(e.target.value)}
-  >
-    <option value="">Todas las mesas</option>
-    {tableNumbers.map((n) => (
-      <option key={n} value={n}>Mesa {n}</option>
-    ))}
-  </select>
 
-  <input
-    style={styles.select}
-    type="date"
-    value={financeDateFilter}
-    onChange={(e) => setFinanceDateFilter(e.target.value)}
-  />
-
-  <input
-    style={styles.select}
-    type="time"
-    value={financeStartTime}
-    onChange={(e) => setFinanceStartTime(e.target.value)}
-  />
-
-  <input
-    style={styles.select}
-    type="time"
-    value={financeEndTime}
-    onChange={(e) => setFinanceEndTime(e.target.value)}
-  />
-
-  <button
-    style={styles.secondaryButton}
-    onClick={() => {
-      setFinanceTableFilter("");
-      setFinanceDateFilter("");
-      setFinanceStartTime("");
-      setFinanceEndTime("");
-    }}
-  >
-    Limpiar filtros
-  </button>
-</div>
-
-<div style={styles.totalLine}>
-  <span>Total filtrado</span>
-  <span>{money(filteredFinanceTotal)}</span>
-</div>
-    </section>
-
-    {filteredClosedAccounts.length === 0 ? (
-      <section style={styles.empty}>No hay cuentas pagadas todavía.</section>
-    ) : (
-      <div style={styles.ordersGrid}>
-        {filteredClosedAccounts.map((account) => (
-          <div key={account.id} style={styles.card}>
-            <h3 style={styles.orderTable}>Mesa {account.table_number}</h3>
-            <p style={styles.accountCode}>Cuenta: {account.account_code}</p>
-
-            <p>
-              <strong>Total pagado:</strong> {money(account.total)}
-            </p>
-
-            <p>
-              <strong>Abierta:</strong>{" "}
-              {account.opened_at
-                ? new Date(account.opened_at).toLocaleString("es-MX")
-                : "N/A"}
-            </p>
-
-            <p>
-              <strong>Cerrada:</strong>{" "}
-              {new Date(account.closed_at).toLocaleString("es-MX")}
-            </p>
-
-            <details>
-              <summary>Ver pedidos</summary>
-
-              {(account.orders || []).map((order) => (
-                <div key={order.id} style={styles.noteBox}>
-                  <p>
-                    <strong>Status:</strong> {order.status}
-                  </p>
-
-                  {(order.items || []).map((item) => (
-                    <div key={item.id} style={styles.cartLine}>
-                      <span>
-                        {item.qty} × {item.name}
-                        {item.cancelled ? " — Cancelado" : ""}
-                      </span>
-                      <strong>{money(item.qty * item.price)}</strong>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </details>
-          </div>
-        ))}
-      </div>
-    )}
-  </main>
-)}
         {view === "qr" && (
           <main>
             <section style={styles.card}>
