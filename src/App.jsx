@@ -7,12 +7,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const menu = [
-  { id: "ramen-shoyu", name: "Ramen Shoyu", category: "Ramen", price: 185, desc: "Caldo de soya, chashu, huevo y cebollín." },
-  { id: "ramen-miso", name: "Ramen Miso", category: "Ramen", price: 195, desc: "Caldo intenso de miso, cerdo y maíz." },
+  { id: "ramen-shoyu", name: "Ramen Shoyu", category: "Ramen", price: 185, desc: "Caldo de soya, chashu, huevo y cebollÃ­n." },
+  { id: "ramen-miso", name: "Ramen Miso", category: "Ramen", price: 195, desc: "Caldo intenso de miso, cerdo y maÃ­z." },
   { id: "gyoza", name: "Gyozas", category: "Entradas", price: 95, desc: "6 piezas doradas con salsa ponzu." },
-  { id: "karaage", name: "Karaage", category: "Entradas", price: 125, desc: "Pollo frito japonés con mayo spicy." },
-  { id: "matcha", name: "Matcha Latte", category: "Bebidas", price: 75, desc: "Frío o caliente." },
-  { id: "calpis", name: "Calpis Soda", category: "Bebidas", price: 65, desc: "Refresco japonés ligero y dulce." },
+  { id: "karaage", name: "Karaage", category: "Entradas", price: 125, desc: "Pollo frito japonÃ©s con mayo spicy." },
+  { id: "matcha", name: "Matcha Latte", category: "Bebidas", price: 75, desc: "FrÃ­o o caliente." },
+  { id: "calpis", name: "Calpis Soda", category: "Bebidas", price: 65, desc: "Refresco japonÃ©s ligero y dulce." },
 ];
 
 const tableNumbers = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -138,7 +138,7 @@ export default function App() {
         <header style={styles.header}>
           <div>
             <div style={styles.kicker}>MVP restaurante</div>
-            <h1 style={styles.title}>Menú dinámico por QR</h1>
+            <h1 style={styles.title}>MenÃº dinÃ¡mico por QR</h1>
             <p style={styles.subtitle}>Cada mesa tiene su propio QR y cocina recibe pedidos en tiempo real.</p>
           </div>
           <div style={styles.switcher}>
@@ -189,10 +189,10 @@ export default function App() {
             </main>
 
             <aside style={styles.cartCard}>
-              <h2 style={styles.sectionTitle}>Pedido — Mesa {tableNumber}</h2>
-              {cartItems.length === 0 ? <p style={styles.helpText}>Todavía no hay productos.</p> : cartItems.map((item) => (
+              <h2 style={styles.sectionTitle}>Pedido â€” Mesa {tableNumber}</h2>
+              {cartItems.length === 0 ? <p style={styles.helpText}>TodavÃ­a no hay productos.</p> : cartItems.map((item) => (
                 <div key={item.id} style={styles.cartLine}>
-                  <span>{item.qty} × {item.name}</span>
+                  <span>{item.qty} Ã— {item.name}</span>
                   <strong>{money(item.qty * item.price)}</strong>
                 </div>
               ))}
@@ -212,7 +212,7 @@ export default function App() {
               <p style={styles.helpText}>URL recomendada para personal: {baseUrl}/?admin=1</p>
             </section>
 
-            {orders.length === 0 ? <section style={styles.empty}>No hay pedidos todavía.</section> : (
+            {orders.length === 0 ? <section style={styles.empty}>No hay pedidos todavÃ­a.</section> : (
               <div style={styles.ordersGrid}>
                 {orders.map((order) => (
                   <div key={order.id} style={styles.card}>
@@ -225,7 +225,7 @@ export default function App() {
                     </div>
                     {(order.items || []).map((item) => (
                       <div key={item.id} style={styles.cartLine}>
-                        <span>{item.qty} × {item.name}</span>
+                        <span>{item.qty} Ã— {item.name}</span>
                         <strong>{money(item.qty * item.price)}</strong>
                       </div>
                     ))}
@@ -248,7 +248,7 @@ export default function App() {
           <main>
             <section style={styles.card}>
               <h2 style={styles.sectionTitle}>Generador de QR por mesa</h2>
-              <p style={styles.helpText}>Imprime estos QR. Cada uno abre el menú con la mesa ya ligada.</p>
+              <p style={styles.helpText}>Imprime estos QR. Cada uno abre el menÃº con la mesa ya ligada.</p>
             </section>
             <div style={styles.qrGrid}>
               {tableNumbers.map((n) => {
