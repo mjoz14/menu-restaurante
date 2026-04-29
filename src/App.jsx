@@ -48,6 +48,9 @@ export default function App() {
   const [financeEndTime, setFinanceEndTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const ADMIN_PIN = "1234";
+const [pinInput, setPinInput] = useState("");
+const [isUnlocked, setIsUnlocked] = useState(false);
 
   const baseUrl = window.location.origin;
 
@@ -82,7 +85,11 @@ export default function App() {
     supabase.removeChannel(channel);
     clearInterval(interval);
   };
+  
 }, []);
+
+// 👇 AQUÍ
+
 //autorefresh
 
   async function loadOrders() {
@@ -181,6 +188,36 @@ const payload = {
     setMessage("Pedido enviado. El personal ya puede verlo.");
   }
 
+
+async function callWaiter() {
+  const { error } = await supabase.from("orders").insert({
+    table_number: tableNumber,
+    account_code: `WAITER-${tableNumber}-${Date.now()}`,
+    account_closed: false,
+    items: [
+      {
+        id: "call-waiter",
+        name: "Llamar mesero",
+        qty: 1,
+        price: 0,
+        service_call: true,
+      },
+    ],
+    notes: "La mesa solicita al mesero.",
+    total: 0,
+    status: "Nuevo",
+  });
+
+  if (error) {
+    console.error(error);
+    setMessage("No se pudo llamar al mesero.");
+    return;
+  }
+
+  setMessage("");
+}
+  
+  
   async function updateStatus(orderId, status) {
     const { error } = await supabase
       .from("orders")
@@ -338,6 +375,9 @@ async function payAccount(group) {
 }
 const groupedOrders = Object.values(
   orders.reduce((acc, order) => {
+	  if ((order.items || []).some((item) => item.service_call)) {
+      return acc;
+    }
     const key = order.account_code || `Sin cuenta - Mesa ${order.table_number}`;
 
     if (!acc[key]) {
@@ -349,8 +389,15 @@ const groupedOrders = Object.values(
         latest_status: order.status,
       };
     }
+	const hasActiveWaiterCall = orders.some(
+  (order) =>
+    String(order.table_number) === String(tableNumber) &&
+    (order.items || []).some((item) => item.service_call)
+);
 
-    acc[key].orders.push(order);
+    if (!(order.items || []).some((item) => item.service_call)) {
+  acc[key].orders.push(order);
+}
     if (order.status === "Entregado") {
   acc[key].total += Number(order.total || 0);
 }
@@ -384,21 +431,102 @@ const filteredFinanceTotal = filteredClosedAccounts.reduce(
   (sum, account) => sum + Number(account.total || 0),
   0
 );
+
+const waiterCalls = orders.filter((order) =>
+  (order.items || []).some((item) => item.service_call)
+);
+
+function hasWaiterCall(table) {
+  return waiterCalls.some(
+    (call) => String(call.table_number) === String(table)
+  );
+}
+
+async function clearWaiterCall(table) {
+  const callsToClear = waiterCalls.filter(
+    (call) => String(call.table_number) === String(table)
+  );
+
+  for (const call of callsToClear) {
+    await supabase.from("orders").delete().eq("id", call.id);
+  }
+
+  loadOrders();
+}
+if ((view === "staff" || view === "finance") && !isUnlocked) {
+  return (
+    <div style={styles.page}>
+      <div style={{ ...styles.card, maxWidth: 400, margin: "80px auto" }}>
+        <h2 style={styles.sectionTitle}>Acceso restringido</h2>
+        <p style={styles.helpText}>Ingresa el PIN para continuar.</p>
+
+        <input
+          style={styles.select}
+          type="password"
+          value={pinInput}
+          onChange={(e) => setPinInput(e.target.value)}
+          placeholder="PIN"
+        />
+
+        <button
+          style={{ ...styles.primaryButton, marginTop: 12, width: "100%" }}
+          onClick={() => {
+            if (pinInput === ADMIN_PIN) {
+              setIsUnlocked(true);
+              setMessage("");
+            } else {
+              setMessage("PIN incorrecto.");
+            }
+          }}
+        >
+          Entrar
+        </button>
+
+        {message && <div style={styles.message}>{message}</div>}
+      </div>
+    </div>
+  );
+}
 return (
     <div style={styles.page}>
       <div style={styles.container}>
         <header style={styles.header}>
           <div>
             <div style={styles.kicker}>MVP restaurante</div>
-            <h1 style={styles.title}>Menú dinámico por QR</h1>
-            <p style={styles.subtitle}>Cada mesa tiene su propio QR y cocina recibe pedidos en tiempo real.</p>
+            <h1 style={styles.title}>Menú dinámico</h1>
+            <p style={styles.subtitle}>Si no quieres hablar con un mesero hazlo tu solo.</p>
           </div>
-          <div style={styles.switcher}>
-            <button style={view === "customer" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("customer")}>Cliente</button>
-            <button style={view === "staff" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("staff")}>Personal</button>
-            <button style={view === "qr" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("qr")}>QRs</button>
-			<button style={view === "finance" ? styles.primaryButton : styles.secondaryButton} onClick={() => setView("finance")}>Finanzas</button>
-          </div>
+         {!new URLSearchParams(window.location.search).get("mesa") && (
+  <div style={styles.switcher}>
+    <button
+      style={view === "customer" ? styles.primaryButton : styles.secondaryButton}
+      onClick={() => setView("customer")}
+    >
+      Cliente
+    </button>
+
+    <button
+      style={view === "staff" ? styles.primaryButton : styles.secondaryButton}
+      onClick={() => setView("staff")}
+    >
+      Personal
+    </button>
+
+    <button
+      style={view === "qr" ? styles.primaryButton : styles.secondaryButton}
+      onClick={() => setView("qr")}
+    >
+      QRs
+    </button>
+
+    <button
+      style={view === "finance" ? styles.primaryButton : styles.secondaryButton}
+      onClick={() => setView("finance")}
+    >
+      Finanzas
+    </button>
+  </div>
+)}
         </header>
 
         {message && <div style={styles.message}>{message}</div>}
@@ -409,10 +537,27 @@ return (
               <section style={styles.card}>
                 <h2 style={styles.sectionTitle}>Mesa {tableNumber}</h2>
                 <p style={styles.helpText}>Tu pedido quedará ligado a esta mesa.</p>
+				<button
+  style={{ ...styles.secondaryButton, marginTop: 12 }}
+  onClick={callWaiter}
+>
+  Llamar mesero
+</button>
+
+{orders.some(
+  (order) =>
+    String(order.table_number) === String(tableNumber) &&
+    (order.items || []).some((item) => item.service_call)
+) && (
+  <p style={{ color: "#dc2626", fontWeight: "bold", marginTop: 8 }}>
+    🔔 Mesero solicitado
+  </p>
+)}
 
 {orders
   .filter((order) => String(order.table_number) === String(tableNumber))
   .filter((order) => order.account_closed === false)
+  .filter((order) => !(order.items || []).some((item) => item.service_call))
   .slice(0, 1)
   .map((order) => {
 	  {/*const totalCuenta = orders
@@ -427,7 +572,8 @@ const pedidosDeCuenta = orders.filter(
   (o) =>
     String(o.table_number) === String(tableNumber) &&
     o.account_code === order.account_code &&
-    o.account_closed === false
+    o.account_closed === false &&
+    !(o.items || []).some((item) => item.service_call)
 );
 
 const totalPedido = pedidosDeCuenta.reduce(
@@ -488,12 +634,44 @@ const totalEntregado = pedidosDeCuenta
 
             <aside style={styles.cartCard}>
               <h2 style={styles.sectionTitle}>Pedido — Mesa {tableNumber}</h2>
-              {cartItems.length === 0 ? <p style={styles.helpText}>Todavía no hay productos.</p> : cartItems.map((item) => (
-                <div key={item.id} style={styles.cartLine}>
-                  <span>{item.qty} × {item.name}</span>
-                  <strong>{money(item.qty * item.price)}</strong>
-                </div>
-              ))}
+             {cartItems.length === 0 ? (
+  <p style={styles.helpText}>Todavía no hay productos.</p>
+) : (
+  cartItems.map((item) => (
+    <div key={item.id} style={styles.cartLine}>
+      <span>{item.qty} × {item.name}</span>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <strong>{money(item.qty * item.price)}</strong>
+
+        <button
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            border: "none",
+            background: "#ef4444",
+            color: "white",
+            fontWeight: "bold",
+            cursor: "pointer",
+            fontSize: 14,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => {
+            setCart((prev) => ({
+              ...prev,
+              [item.id]: 0,
+            }));
+          }}
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  ))
+)}
               <textarea style={styles.textarea} placeholder="Notas: sin cebolla, poco picante, alergias..." value={notes} onChange={(e) => setNotes(e.target.value)} />
               <div style={styles.totalLine}><span>Total</span><span>{money(total)}</span></div>
               <button style={cartItems.length ? styles.fullButton : styles.disabledButton} onClick={placeOrder} disabled={!cartItems.length || loading}>
@@ -506,9 +684,28 @@ const totalEntregado = pedidosDeCuenta
         {view === "staff" && (
           <main>
             <section style={styles.card}>
-              <h2 style={styles.sectionTitle}>Panel de cocina / meseros</h2>
-              <p style={styles.helpText}>URL recomendada para personal: {baseUrl}/?admin=1</p>
-            </section>
+  <h2 style={styles.sectionTitle}>Panel de cocina / meseros</h2>
+  <p style={styles.helpText}>URL recomendada para personal: {baseUrl}/?admin=1</p>
+
+  <div style={styles.tableButtonGrid}>
+    {tableNumbers.map((table) => {
+      const active = hasWaiterCall(table);
+
+      return (
+        <button
+          key={table}
+          style={{
+            ...styles.tableButton,
+            background: active ? "#dc2626" : "#16a34a",
+          }}
+          onClick={() => clearWaiterCall(table)}
+        >
+          Mesa {table}
+        </button>
+      );
+    })}
+  </div>
+</section>
 
 			 {orders.length === 0 ? <section style={styles.empty}>No hay pedidos todavía.</section> : (
               <div style={styles.ordersGrid}>
@@ -569,7 +766,7 @@ const totalEntregado = pedidosDeCuenta
     borderLeft: `6px solid ${
       order.status === "Nuevo"
         ? "#3b82f6"
-        : order.status === "Preparando"
+        : order.status === "Preparado"
         ? "#f59e0b"
         : order.status === "Entregado"
         ? "#10b981"
@@ -637,31 +834,19 @@ const totalEntregado = pedidosDeCuenta
         {order.notes && <p><strong>Notas:</strong> {order.notes}</p>}
 
         <div style={styles.statusButtons}>
-  <button
-    style={styles.secondaryButton}
-    onClick={() => updateStatus(order.id, "Preparando")}
-  >
-    Preparando
-  </button>
+ <button
+  style={styles.secondaryButton}
+  onClick={() => updateStatus(order.id, "Preparado")}
+>
+  Preparado
+</button>
 
-  <button
-    style={styles.primaryButton}
-    onClick={() => updateStatus(order.id, "Entregado")}
-  >
-    Entregado
-  </button>
-
-  <button
-    style={styles.dangerButton}
-    onClick={() => {
-      const confirmed = window.confirm("¿Seguro que quieres cancelar este pedido?");
-      if (confirmed) {
-        updateStatus(order.id, "Cancelado");
-      }
-    }}
-  >
-    Cancelado
-  </button>
+<button
+  style={styles.primaryButton}
+  onClick={() => updateStatus(order.id, "Entregado")}
+>
+  Entregado
+</button>
 </div>
       </div>
     ))}
@@ -879,4 +1064,19 @@ const styles = {
   qrBox: { background: "white", padding: 16, display: "inline-block" },
   urlText: { fontSize: 12, color: "#52525b", wordBreak: "break-all" },
   mobileNote: {  fontSize: 13,  color: "#71717a",},
+  tableButtonGrid: {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
+  gap: 10,
+  marginTop: 16,
+},
+
+tableButton: {
+  color: "white",
+  border: "none",
+  borderRadius: 12,
+  padding: "14px 10px",
+  fontWeight: 800,
+  cursor: "pointer",
+},
 };
